@@ -5,6 +5,12 @@ from flask import Flask, request, jsonify, url_for, Blueprint
 from api.models import db, User
 from api.utils import generate_sitemap, APIException
 from flask_cors import CORS
+import json
+from flask_jwt_extended import create_access_token
+from flask_jwt_extended import get_jwt_identity
+from flask_jwt_extended import jwt_required
+from flask_jwt_extended import JWTManager
+
 
 api = Blueprint('api', __name__)
 
@@ -12,11 +18,31 @@ api = Blueprint('api', __name__)
 CORS(api)
 
 
-@api.route('/hello', methods=['POST', 'GET'])
-def handle_hello():
+@api.route('/register', methods=['POST', 'GET'])
+def addUser():
+    body=json.loads(request.data)
+    existUser=User.query.filter_by(email=body['email']).first()
+    if existUser is None:
+        newUser=User(
+            email=body['email'],
+            password=body['password']
+        )
+        db.session.add(newUser)
+        db.session.commit()
+        return jsonify({'msg':'usuario creado'})
+    return jsonify({'msg':'el usuario ya existe'})
 
-    response_body = {
-        "message": "Hello! I'm a message that came from the backend, check the network tab on the google inspector and you will see the GET request"
-    }
+# Create a route to authenticate your users and return JWTs. The
+# create_access_token() function is used to actually generate the JWT.
+@api.route("/login", methods=["POST"])
+def login():
+    email = request.json.get("email", None)
+    password = request.json.get("password", None)
+    existUser=User.query.filter_by(email=email).first()
 
-    return jsonify(response_body), 200
+    if email != existUser.email or password != existUser.password:
+        return jsonify({"msg": "Bad username or password"}), 401
+
+    access_token = create_access_token(identity=email)
+    return jsonify(access_token=access_token)
+
